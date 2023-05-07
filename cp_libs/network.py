@@ -51,18 +51,18 @@ class Network(InterfaceProtocol):
         return self.transport.is_connected()
 
     def ntp_time_sync(self) -> bool:
-        failed = False
+        success = True
         if self.ntp:
             try:
                 rtc.RTC().datetime = self.ntp.datetime
             except OSError as exc:
                 logger.error("NTP time sync failed:")
                 logger.error(f"{''.join(traceback.format_exception(exc, chain=True))}")
-                failed = True
+                success = False
         else:
             logger.warning("NTP not enabled for this network")
 
-        return failed
+        return success
 
     def receive(self, rxed_data: list, **kwargs) -> bool:
         return self.transport.receive(rxed_data, **kwargs)
@@ -72,6 +72,23 @@ class Network(InterfaceProtocol):
 
     def send(self, msg, **kwargs) -> bool:
         return self.transport.send(msg, **kwargs)
+
+    @classmethod
+    def create_espnow(cls, id_prefix: str = "") -> "Network":
+        """Creates and returns a Network instance configured to the ESPNow protocol.
+
+        Utilizes the espnow protocol.
+
+        Args:
+            id_prefix (str, optional): Prefix string for client ID. Defaults to "".
+
+        Returns:
+            Network: Network instance.
+        """
+        client_id = id_prefix + str(int.from_bytes(microcontroller.cpu.uid, 'little') >> 29)
+        espnow_protocol = EspnowProtocol(config["epn_peer_mac"], hostname=client_id, channel=config["epn_channel"])
+
+        return cls(espnow_protocol)
 
     @classmethod
     def create_min_iot(cls, id_prefix: str = "") -> "Network":
@@ -86,7 +103,7 @@ class Network(InterfaceProtocol):
             Network: Network instance.
         """
         client_id = id_prefix + str(int.from_bytes(microcontroller.cpu.uid, 'little') >> 29)
-        espnow_protocol = EspnowProtocol(config["epn_peer_mac"], hostname=client_id)
+        espnow_protocol = EspnowProtocol(config["epn_peer_mac"], hostname=client_id, channel=config["epn_channel"])
         serial_protocol = SerialProtocol(espnow_protocol, mtu_size_bytes=DEFAULT_MTU_SIZE_BYTES)
         min_iot_protocol = MinIotProtocol(serial_protocol)
 
@@ -95,6 +112,7 @@ class Network(InterfaceProtocol):
     @classmethod
     def create_mqtt(cls,
                     id_prefix: str = "",
+                    keep_alive_sec: int = None,
                     on_connect_cb=None,
                     on_disconnect_cb=None,
                     on_publish_cb=None,
@@ -107,6 +125,8 @@ class Network(InterfaceProtocol):
 
         Args:
             id_prefix (str, optional): Prefix string for client ID. Defaults to "".
+            keep_alive_sec (int, optional): Maximum period allowed for communication within single
+                                            connection attempt, in seconds. Overrides config.
             on_connect_cb (calleable, optional): On connection callback. Defaults to None.
             on_disconnect_cb (calleable, optional): On disconnect callback. Defaults to None.
             on_publish_cb (calleable, optional): On msg publish callback. Defaults to None.
@@ -129,7 +149,7 @@ class Network(InterfaceProtocol):
             password=secrets["mqtt_password"],
             socket_pool=socket_pool,
             ssl_context=ssl.create_default_context(),
-            keep_alive=config["keep_alive_sec"],
+            keep_alive=keep_alive_sec if keep_alive_sec else config["keep_alive_sec"],
             connect_retries=config["connect_retries"],
             recv_timeout=config["recv_timeout_sec"],
         )
@@ -141,7 +161,7 @@ class Network(InterfaceProtocol):
         client.on_message = on_message_cb
         client.enable_logger(logging, log_level=config["logging_level"])
 
-        wifi_protocol = WifiProtocol(secrets["ssid"], secrets["password"], client_id)
+        wifi_protocol = WifiProtocol(secrets["ssid"], secrets["password"], client_id, config["wifi_channel"])
         mqtt_protocol = MqttProtocol(wifi_protocol, client)
 
         return cls(mqtt_protocol, ntp)

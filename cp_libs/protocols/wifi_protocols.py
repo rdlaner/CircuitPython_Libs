@@ -189,10 +189,11 @@ class WifiProtocol(InterfaceProtocol):
     GOOGLE_IP_ADDRESS = ipaddress.ip_address("8.8.4.4")
     DEFAULT_CONNECTION_ATTEMPTS = const(3)
 
-    def __init__(self, ssid: str, password: str, hostname: str = None) -> None:
+    def __init__(self, ssid: str, password: str, hostname: str = None, channel: int = 0) -> None:
         super().__init__()
         self._ssid = ssid
         self._password = password
+        self._channel = channel
         self._network_connected = False
 
         if hostname:
@@ -228,7 +229,7 @@ class WifiProtocol(InterfaceProtocol):
                     logger.debug(f"ssid: {network.ssid}, rssi: {network.rssi}")
 
                 try:
-                    wifi.radio.connect(self._ssid, self._password)
+                    wifi.radio.connect(self._ssid, self._password, channel=self._channel)
                 except (RuntimeError, ConnectionError) as exc:
                     logger.error(f"Could not connect to wifi AP: {self._ssid}")
                     logger.error(f"{''.join(traceback.format_exception(exc, chain=True))}")
