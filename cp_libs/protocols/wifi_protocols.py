@@ -515,3 +515,9 @@ class MqttProtocol(InterfaceProtocol):
                 raise RuntimeError("Did not attempt recovery.") from exc
 
         return success
+
+    def subscribe(self, topic, qos: int = 0) -> None:
+        self.mqtt_client.subscribe(topic, qos)
+
+    def unsubscribe(self, topic) -> None:
+        self.mqtt_client.unsubscribe(topic)

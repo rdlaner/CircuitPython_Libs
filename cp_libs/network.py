@@ -67,11 +67,19 @@ class Network(InterfaceProtocol):
     def receive(self, rxed_data: list, **kwargs) -> bool:
         return self.transport.receive(rxed_data, **kwargs)
 
-    def recover(self, **kwargs) -> None:
+    def recover(self, **kwargs) -> bool:
         return self.transport.recover(**kwargs)
 
     def send(self, msg, **kwargs) -> bool:
         return self.transport.send(msg, **kwargs)
+
+    def subscribe(self, topic, qos: int = 0) -> None:
+        if getattr(self.transport, "subscribe", None):
+            self.transport.subscribe(topic, qos)
+
+    def unsubscribe(self, topic) -> None:
+        if getattr(self.transport, "unsubscribe", None):
+            self.transport.unsubscribe(topic)
 
     @classmethod
     def create_espnow(cls, id_prefix: str = "") -> "Network":
