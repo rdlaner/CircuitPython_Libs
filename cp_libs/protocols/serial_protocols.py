@@ -498,15 +498,20 @@ class SerialProtocol(InterfaceProtocol):
     def send(self, msg, **kwargs) -> bool:
         """Synchronously send data using the SerialProtocol.
 
-        Constructs a SerialMessage with the `msg` as the payload and sends over transport.
+        If msg is of type SerialMessage, this function will take it as-is and send over transport.
+        If msg is of any other type, this function will construct a SerialMessage with the msg
+        as the payload and send it over the transport.
 
         Args:
-            msg (generic): Serial message payload.
+            msg (any): Message to send. Can be a prebuilt SerialMessage or just the data.
 
         Returns:
             bool: True if send succeeded, False if it failed.
         """
-        serial_msg = SerialMessage.create_msg_from_data(msg, self.mtu_size_bytes)
+        if isinstance(msg, SerialMessage):
+            serial_msg = msg
+        else:
+            serial_msg = SerialMessage.create_msg_from_data(msg, self.mtu_size_bytes)
 
         return self.send_serial_msg(serial_msg)
 
