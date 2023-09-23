@@ -1,4 +1,9 @@
 """Minimal IoT Protocol Implementation"""
+# TODO: Update miniot and serial protocol receive functions to return True even if only partial msg
+#       has been received, require the user to check for None to know if a full msg is returned.
+#       This will allow users to know when to poll repeatedly which is important for those that
+#       call receive infrequently.
+
 # Standard imports
 import json
 import time
@@ -23,7 +28,7 @@ logger.setLevel(config["logging_level"])
 
 class MinIotMessage():
     """Minimal IoT Message definition for use with the MinIotProtocol"""
-    def __init__(self, topic: str, msg: dict) -> None:
+    def __init__(self, topic: str, msg: str) -> None:
         self.data = {
             "topic": topic,
             "msg": msg,
@@ -139,21 +144,40 @@ class MinIotProtocol(InterfaceProtocol):
 
         return data_available
 
-    def send(self, msg: dict, **kwargs) -> bool:
-        """Synchronously send a MinIotMessage.
+    def send(self, msg, **kwargs) -> bool:
+        """Synchronously send raw data via MinIoT protocol.
 
-        Constructs a MinIotMessage with the given msg str as the payload and then sends that message
-        via the provided transport.
+        Constructs a MinIotMessage with the given msg object as the payload and then sends that
+        message via the provided transport.
 
         Args:
-            msg (dict): MinIotMessage msg.
+            msg (any): Msg payload. If not str or MinIotMessage, will convert to str.
             topic (str): MinIotMessage topic.
 
         Returns:
             bool: True if successful, False if failed.
         """
+        miniot_msg = None
         topic = kwargs.get("topic", None)
-        min_iot_msg = MinIotMessage(topic, msg)
-        min_iot_msg.data["sent_ts"] = time.time()
 
-        return self.transport.send(min_iot_msg.serialize())
+        if isinstance(msg, str):
+            miniot_msg = MinIotMessage(topic, msg)
+        elif isinstance(msg, MinIotMessage):
+            miniot_msg = msg
+        else:
+            miniot_msg = MinIotMessage(topic, str(msg))
+
+        return self.send_miniot_msg(miniot_msg)
+
+    def send_miniot_msg(self, msg: MinIotMessage) -> bool:
+        """Synchronously send a MinIoTMessage via MinIoT protocol.
+
+        Args:
+            msg (MinIotMessage): MinIoTMessage to send.
+
+        Returns:
+            bool: True if successful, False if failed.
+        """
+        msg.data["sent_ts"] = time.time()
+
+        return self.transport.send(msg.serialize())
