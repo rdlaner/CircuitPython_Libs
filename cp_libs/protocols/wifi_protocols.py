@@ -28,7 +28,6 @@ except ImportError:
 logger = logging.getLogger("wifi-protocols")
 logger.setLevel(config["logging_level"])
 
-# TODO: Update espnow proto to support multiple peers
 # TODO: Metrics don't persist for espnow when using deep sleep mode...
 # TODO: Add support for using a static IP address w/ wifi. This should help with connection times.
 # TODO: Add retry attempts to espnow send?
@@ -40,12 +39,18 @@ class EspnowProtocol(InterfaceProtocol):
     # Constants
     ESPNOW_BUFFER_SIZE_BYTES = const(8192)
 
-    def __init__(self, epn_peer_mac: str, hostname: str = None, channel: int = 0) -> None:
+    def __init__(self, peer_macs, hostname: str = None, channel: int = 0) -> None:
         super().__init__()
         self.epn = espnow.ESPNow(buffer_size=self.ESPNOW_BUFFER_SIZE_BYTES)
-        self.epn_peer = espnow.Peer(mac=epn_peer_mac, channel=channel)
-        self.epn.peers.append(self.epn_peer)
         self.hostname = hostname
+
+        if isinstance(peer_macs, list):
+            for mac in peer_macs:
+                peer = espnow.Peer(mac=mac, channel=channel)
+                self.epn.peers.append(peer)
+        else:
+            peer = espnow.Peer(mac=peer_macs, channel=channel)
+            self.epn.peers.append(peer)
 
         self._network_disable()
 
